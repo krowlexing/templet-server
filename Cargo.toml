@@ -1,0 +1,16 @@
+[package]
+name = "report-generator-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version ="0.7.5", features = ["json", "ws"] }
+bcrypt = "0.15.1"
+hmac = "0.12.1"
+jwt = "0.16.0"
+rusqlite = "0.32.1"
+serde = "1.0.209"
+serde_json = "1.0.127"
+sha2 = "0.10.8"
+tokio = { version = "1.39.3", features = ["full"] }
+tower = "0.5.0"
