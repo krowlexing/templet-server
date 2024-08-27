@@ -11,6 +11,7 @@ jwt = "0.16.0"
 rusqlite = "0.32.1"
 serde = "1.0.209"
 serde_json = "1.0.127"
+serde_repr = "0.1.19"
 sha2 = "0.10.8"
 tokio = { version = "1.39.3", features = ["full"] }
 tower = "0.5.0"

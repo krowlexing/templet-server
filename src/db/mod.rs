@@ -3,9 +3,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use apps::Apps;
 use rusqlite::{Connection, Row};
 use users::Users;
 
+pub mod apps;
 pub mod table;
 pub mod users;
 pub enum SqlError {
@@ -33,6 +35,7 @@ pub type Db = Arc<SqliteDb>;
 pub struct SqliteDb {
     con: Con,
     pub users: Users,
+    pub apps: Apps,
 }
 
 impl SqliteDb {
@@ -43,6 +46,7 @@ impl SqliteDb {
 
         let db = Self {
             users: Users::new(&con),
+            apps: Apps::new(&con),
             con,
         };
 
@@ -50,6 +54,10 @@ impl SqliteDb {
     }
 
     pub fn init(&self) -> Result<usize, rusqlite::Error> {
+        {
+            let con = self.con.lock().unwrap();
+            con.execute("PRAGMA foreign_keys = ON", ())?;
+        }
         self.users.create_table()
     }
 }

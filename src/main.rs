@@ -3,12 +3,13 @@ use ::core::marker::Send;
 use ::core::pin::Pin;
 use std::sync::Arc;
 
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts, OriginalUri, Path, State};
 use axum::http::request::Parts;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{async_trait, Json};
 use axum::{routing::post, Router};
+use db::apps::{AppStatus, NewApp};
 use db::users::{NewUser, User};
 use db::{Db, SqliteDb};
 use hmac::{Hmac, Mac};
@@ -28,7 +29,9 @@ async fn main() {
         .route("/convert", post(process_markdown))
         .route("/register", post(register))
         .route("/login", post(login))
-        .route("/test", get(test_auth))
+        .route("/apps/", get(all_apps))
+        .route("/apps/", post(new_app))
+        .fallback(not_found)
         .with_state(db);
 
     // run our app with hyper, listening globally on port 3000
@@ -38,6 +41,10 @@ async fn main() {
 
 async fn handle_index() -> &'static str {
     "Hello World!"
+}
+
+async fn not_found(OriginalUri(x): axum::extract::OriginalUri) -> impl IntoResponse {
+    format!("cringe request: {}", x.clone())
 }
 
 async fn process_markdown(body: String) -> impl IntoResponse {
@@ -113,8 +120,58 @@ handle_request![register(db, req: RegisterRequest) {
     }
 }];
 
-async fn test_auth(Claim(claim): Claim) -> impl IntoResponse {
-    format!("hey there {}", claim.username)
+async fn all_apps(State(db): State<Db>) -> impl IntoResponse {
+    match db.apps.select_all() {
+        Ok(apps) => (StatusCode::OK, serde_json::to_string(&apps).unwrap()),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
+    }
+}
+
+/**
+    some user requested to create new app
+*/
+#[derive(Serialize, Deserialize)]
+pub struct NewAppRequest {
+    pub title: String,
+    pub description: String,
+    pub weblink: String,
+    pub version: String,
+    pub public: bool,
+    pub status: AppStatus,
+}
+
+impl NewAppRequest {
+    pub fn with_author(self, author: String) -> NewApp {
+        let Self {
+            title,
+            description,
+            weblink,
+            version,
+            public,
+            status,
+        } = self;
+
+        NewApp {
+            author,
+            title,
+            description,
+            weblink,
+            version,
+            public,
+            status,
+        }
+    }
+}
+
+async fn new_app(
+    State(db): State<Db>,
+    Claim(claim): Claim,
+    Json(new_app): Json<NewAppRequest>,
+) -> impl IntoResponse {
+    match db.apps.insert(new_app.with_author(claim.username)) {
+        Ok(apps) => (StatusCode::OK, serde_json::to_string(&apps).unwrap()),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
+    }
 }
 
 pub fn generate_claim(username: String) -> String {
