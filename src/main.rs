@@ -1,14 +1,18 @@
+use ::core::future::Future;
+use ::core::marker::Send;
+use ::core::pin::Pin;
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Json;
+use axum::{async_trait, Json};
 use axum::{routing::post, Router};
-use db::users::NewUser;
+use db::users::{NewUser, User};
 use db::{Db, SqliteDb};
 use hmac::{Hmac, Mac};
-use jwt::SignWithKey;
+use jwt::{SignWithKey, VerifyWithKey};
 use serde::{Deserialize, Serialize};
 pub mod db;
 
@@ -17,11 +21,14 @@ async fn main() {
     // build our application with a single route
     let db = Arc::new(SqliteDb::new("sqlite.db".to_string()).unwrap());
 
+    db.init().unwrap();
+
     let app = Router::new()
         .route("/", get(handle_index))
         .route("/convert", post(process_markdown))
         .route("/register", post(register))
         .route("/login", post(login))
+        .route("/test", get(test_auth))
         .with_state(db);
 
     // run our app with hyper, listening globally on port 3000
@@ -44,8 +51,8 @@ struct RegisterRequest {
     password: String,
 }
 macro_rules! handle_request {
-    [$name:ident($db:ident, $body:ident : $body_type:ty) $body_block:block] => {
-        async fn $name(State($db): State<Db>, Json($body): Json<$body_type>) -> impl IntoResponse $body_block
+    [$name:ident($db:ident $($others:ident: $other_ty:ty),*, $body:ident : $body_type:ty) $body_block:block] => {
+        async fn $name(State($db): State<Db>, $($others : $other_ty),* Json($body): Json<$body_type>) -> impl IntoResponse $body_block
     };
 }
 
@@ -53,7 +60,7 @@ use axum::http::StatusCode;
 use sha2::Sha256;
 
 #[derive(Serialize, Deserialize)]
-struct UserClaim {
+pub struct UserClaim {
     username: String,
 }
 
@@ -106,9 +113,40 @@ handle_request![register(db, req: RegisterRequest) {
     }
 }];
 
+async fn test_auth(Claim(claim): Claim) -> impl IntoResponse {
+    format!("hey there {}", claim.username)
+}
+
 pub fn generate_claim(username: String) -> String {
     let claim = UserClaim { username };
 
     let key: Hmac<Sha256> = Hmac::new_from_slice(KEY).unwrap();
     claim.sign_with_key(&key).unwrap()
+}
+
+pub fn check_claim(token: &str) -> Result<UserClaim, jwt::Error> {
+    let key: Hmac<Sha256> = Hmac::new_from_slice(KEY).unwrap();
+    token.verify_with_key(&key)
+}
+
+pub struct Claim(UserClaim);
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Claim
+where
+    S: Send + Sync,
+{
+    type Rejection = axum::http::StatusCode;
+
+    #[must_use]
+    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .headers
+            .get("Authorization")
+            .ok_or(StatusCode::UNAUTHORIZED)
+            .and_then(|auth_content| auth_content.to_str().map_err(|_| StatusCode::UNAUTHORIZED))
+            .and_then(|str| check_claim(str).map_err(|_| StatusCode::UNAUTHORIZED))
+            .map(Claim)
+    }
 }

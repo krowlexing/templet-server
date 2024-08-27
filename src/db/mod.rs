@@ -48,6 +48,10 @@ impl SqliteDb {
 
         Ok(db)
     }
+
+    pub fn init(&self) -> Result<usize, rusqlite::Error> {
+        self.users.create_table()
+    }
 }
 //     pub fn create_table(&self) -> Result<usize, rusqlite::Error> {
 //         self.con.execute(
