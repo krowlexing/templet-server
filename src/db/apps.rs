@@ -72,7 +72,7 @@ impl Apps {
     pub fn create_table(&self) -> Result<usize, rusqlite::Error> {
         let con = self.con.lock().unwrap();
         con.execute(
-            "CREATE TABLE apps (
+            "CREATE TABLE IF NOT EXISTS apps (
             id INTEGER PRIMARY KEY,
             author_id INTEGER,
             title TEXT,
@@ -134,6 +134,21 @@ impl Apps {
         let mut stmt = con.prepare_cached("SELECT * FROM apps")?;
         let apps: Vec<AppEntity> = stmt
             .query(())?
+            .mapped(AppEntity::from_row)
+            .collect::<Result<_, _>>()
+            .unwrap();
+
+        Ok(apps)
+    }
+
+    pub fn search_by_name(&self, app_title: String) -> Result<Vec<AppEntity>, rusqlite::Error> {
+        let con = self.con.lock().unwrap();
+
+        let mut stmt =
+            con.prepare_cached("SELECT * FROM apps WHERE apps.title LIKE '%' || ? || '%'")?;
+
+        let apps = stmt
+            .query([app_title])?
             .mapped(AppEntity::from_row)
             .collect::<Result<_, _>>()
             .unwrap();

@@ -1,4 +1,9 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::db::{
@@ -60,4 +65,28 @@ pub async fn new_app(
         Ok(apps) => (StatusCode::OK, serde_json::to_string(&apps).unwrap()),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
     }
+}
+
+#[derive(Deserialize)]
+pub struct AppSearchQuery {
+    q: String,
+}
+
+pub async fn search(
+    State(db): State<Db>,
+    Query(query): Query<AppSearchQuery>,
+) -> impl IntoResponse {
+    let title = query.q;
+    match db.apps.search_by_name(title.clone()) {
+        Ok(apps) => (StatusCode::OK, unwrap_json(&apps)),
+        Err(sql) => {
+            println!("sql error happend while searhing apps by title '{title}'\n {sql:?}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, String::new())
+        }
+    }
+}
+
+pub fn unwrap_json(obj: &impl Serialize) -> String {
+    serde_json::to_string(&obj).unwrap()
 }

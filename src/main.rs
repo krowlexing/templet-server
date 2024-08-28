@@ -5,7 +5,7 @@ use axum::{routing::post, Router};
 
 use db::SqliteDb;
 
-use handlers::apps::{all_apps, new_app};
+use handlers::apps::{self, all_apps, new_app};
 use handlers::auth::{login, register};
 
 pub mod db;
@@ -20,6 +20,7 @@ async fn main() {
     let app = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
+        .route("/apps/search", get(apps::search))
         .route("/apps/", get(all_apps))
         .route("/apps/", post(new_app))
         .with_state(db);
