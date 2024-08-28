@@ -1,6 +1,6 @@
 use std::mem::transmute;
 
-use rusqlite::Row;
+use rusqlite::{Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -155,4 +155,33 @@ impl Apps {
 
         Ok(apps)
     }
+
+    pub fn by_id(&self, app_id: usize) -> Result<Option<NewApp>, rusqlite::Error> {
+        let con = self.con.lock().unwrap();
+        get_app_by_id(&con, app_id)
+    }
+}
+
+impl NewApp {
+    pub fn from_row(row: &Row) -> Result<Self, rusqlite::Error> {
+        Ok(Self {
+            author: row.get("author")?,
+            title: row.get("title")?,
+            description: row.get("description")?,
+            weblink: row.get("weblink")?,
+            version: row.get("version")?,
+            public: row.get("public")?,
+            status: usize::into(row.get("status")?),
+        })
+    }
+}
+
+fn get_app_by_id(con: &Connection, app_id: usize) -> Result<Option<NewApp>, rusqlite::Error> {
+    let mut stmt = con.prepare_cached(
+        "SELECT users.username as author, title, description, weblink, version, public, status
+             FROM apps JOIN users ON apps.author_id = users.id
+             WHERE apps.id = ?",
+    )?;
+    let app = stmt.query_row([app_id], NewApp::from_row).optional()?;
+    Ok(app)
 }

@@ -1,6 +1,7 @@
 use std::io;
 
-use rusqlite::{Error, ErrorCode, Row};
+use rusqlite::{Connection, Error, ErrorCode, Row};
+use serde::{Deserialize, Serialize};
 
 use super::{impl_from_row, Con};
 
@@ -8,6 +9,7 @@ pub struct Users {
     con: Con,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct User {
     pub id: usize,
     pub name: String,
@@ -83,6 +85,11 @@ impl Users {
     pub fn find_user(&self, username: &str, password: &str) -> Result<User, LoginError> {
         find_user(self, username, password)
     }
+
+    pub fn search(&self, query: &str) -> Result<Vec<UserView>, Error> {
+        let con = self.con.lock().unwrap();
+        search(&con, query)
+    }
 }
 
 pub enum LoginError {
@@ -142,4 +149,23 @@ fn register_user(users: &Users, user: &NewUser) -> Result<(), RegistrationError>
         },
         Err(e) => Err(e)?,
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserView {
+    pub id: usize,
+    pub name: String,
+    pub username: String,
+}
+
+impl_from_row!(UserView { id, name, username });
+
+fn search(con: &Connection, query: &str) -> Result<Vec<UserView>, rusqlite::Error> {
+    let mut stmt =
+        con.prepare_cached("SELECT * FROM users WHERE users.username LIKE '%' || ? || '%'")?;
+    let users = stmt
+        .query_map([query], UserView::from_row)?
+        .collect::<Result<_, _>>()
+        .unwrap();
+    Ok(users)
 }

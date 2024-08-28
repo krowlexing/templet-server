@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -81,6 +81,28 @@ pub async fn search(
         Ok(apps) => (StatusCode::OK, unwrap_json(&apps)),
         Err(sql) => {
             println!("sql error happend while searhing apps by title '{title}'\n {sql:?}");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, String::new())
+        }
+    }
+}
+
+pub async fn by_id(
+    State(db): State<Db>,
+    Claim(claim): Claim,
+    Path(id): Path<usize>,
+) -> impl IntoResponse {
+    match db.apps.by_id(id) {
+        Ok(Some(app)) => {
+            if app.public || app.author == claim.username {
+                (StatusCode::OK, unwrap_json(&app))
+            } else {
+                (StatusCode::NOT_FOUND, String::new())
+            }
+        }
+        Ok(None) => (StatusCode::NOT_FOUND, String::new()),
+        Err(sql) => {
+            println!("sql error happend while searching app with id '{id}'\n {sql:?}");
 
             (StatusCode::INTERNAL_SERVER_ERROR, String::new())
         }

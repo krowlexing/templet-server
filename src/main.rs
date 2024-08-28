@@ -7,6 +7,7 @@ use db::SqliteDb;
 
 use handlers::apps::{self, all_apps, new_app};
 use handlers::auth::{login, register};
+use handlers::users;
 
 pub mod db;
 pub mod handlers;
@@ -20,6 +21,8 @@ async fn main() {
     let app = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
+        .route("/users/search", get(users::search))
+        .route("/apps/:app_id/info", get(apps::by_id))
         .route("/apps/search", get(apps::search))
         .route("/apps/", get(all_apps))
         .route("/apps/", post(new_app))

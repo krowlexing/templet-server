@@ -65,4 +65,4 @@ handle_request![login(db, req: LoginRequest) {
     }
 }];
 
-const ERROR: &str = "{ \"status\": \"error\" }";
+pub const ERROR: &str = "{ \"status\": \"error\" }";
