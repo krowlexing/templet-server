@@ -2,33 +2,25 @@ use std::io;
 
 use rusqlite::{Error, ErrorCode, Row};
 
-use super::Con;
+use super::{impl_from_row, Con};
 
 pub struct Users {
     con: Con,
 }
 
 pub struct User {
-    id: usize,
-    name: String,
-    username: String,
-    password: String,
+    pub id: usize,
+    pub name: String,
+    pub username: String,
+    pub password: String,
 }
-// select { sql, params_type, row_type}
-impl User {
-    pub fn from_row(row: &Row) -> Result<User, Error> {
-        let id = row.get("id")?;
-        let name = row.get("name")?;
-        let username = row.get("username")?;
-        let password = row.get("password")?;
-        Ok(Self {
-            id,
-            name,
-            username,
-            password,
-        })
-    }
-}
+
+impl_from_row!(User {
+    id,
+    name,
+    username,
+    password
+});
 
 pub struct NewUser {
     name: String,
