@@ -3,11 +3,10 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use axum_utils::unwrap_json;
 use serde::Deserialize;
 
 use crate::{db::Db, handlers::auth::ERROR};
-
-use super::apps::unwrap_json;
 
 #[derive(Deserialize)]
 pub struct SearchQuery {

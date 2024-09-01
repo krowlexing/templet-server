@@ -62,18 +62,3 @@ impl SqliteDb {
         self.apps.create_table()
     }
 }
-
-#[macro_export]
-macro_rules! impl_from_row {
-    ($type:ty { $($name:ident),+ }) => {
-        impl $type {
-            pub fn from_row(row: &Row) -> Result<$type, rusqlite::Error> {
-                Ok(Self {
-                    $($name: row.get(stringify!($name))?),+
-                })
-            }
-        }
-    };
-}
-
-pub use impl_from_row;

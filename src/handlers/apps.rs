@@ -4,6 +4,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use axum_utils::unwrap_json;
 use serde::{Deserialize, Serialize};
 
 use crate::db::{
@@ -107,8 +108,4 @@ pub async fn by_id(
             (StatusCode::INTERNAL_SERVER_ERROR, String::new())
         }
     }
-}
-
-pub fn unwrap_json(obj: &impl Serialize) -> String {
-    serde_json::to_string(&obj).unwrap()
 }

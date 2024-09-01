@@ -1,9 +1,10 @@
 use std::io;
 
+use axum_utils::impl_from_row;
 use rusqlite::{Connection, Error, ErrorCode, Row};
 use serde::{Deserialize, Serialize};
 
-use super::{impl_from_row, Con};
+use super::Con;
 
 pub struct Users {
     con: Con,

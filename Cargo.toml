@@ -15,3 +15,5 @@ serde_repr = "0.1.19"
 sha2 = "0.10.8"
 tokio = { version = "1.39.3", features = ["full"] }
 tower = "0.5.0"
+axum-utils = { path = "../../axum-utils"}
+sqlx = { version = "0.8.1", features = ["postgres"] }
