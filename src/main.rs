@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{delete, get};
 use axum::{routing::post, Router};
 
 use db::SqliteDb;
 
 use handlers::apps::{self, all_apps, new_app};
 use handlers::auth::{login, register};
-use handlers::users;
+use handlers::{operators, users};
 
 pub mod db;
 pub mod handlers;
@@ -22,6 +22,12 @@ async fn main() {
         .route("/register", post(register))
         .route("/login", post(login))
         .route("/users/search", get(users::search))
+        .route("/apps/:app_id/operators", get(operators::all))
+        .route("/apps/:app_id/operators", post(operators::create))
+        .route(
+            "/apps/:app_id/operators/:operator_id",
+            delete(operators::delete),
+        )
         .route("/apps/:app_id/info", get(apps::by_id))
         .route("/apps/search", get(apps::search))
         .route("/apps/", get(all_apps))

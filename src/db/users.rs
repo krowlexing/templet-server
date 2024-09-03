@@ -12,7 +12,7 @@ pub struct Users {
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
-    pub id: usize,
+    pub id: i32,
     pub name: String,
     pub username: String,
     pub password: String,
@@ -62,13 +62,14 @@ impl Users {
         )
     }
 
-    pub fn insert(&self, user: NewUser) -> Result<usize, Error> {
+    pub fn insert(&self, user: NewUser) -> Result<i32, Error> {
         let hash = bcrypt::hash(user.password, 10).unwrap();
         let con = self.con.lock().unwrap();
 
         let mut stmt =
             con.prepare_cached("INSERT INTO users(name, username, password) VALUES(?,?,?)")?;
-        stmt.execute((user.name, user.username, hash))
+        stmt.execute((user.name, user.username, hash))?;
+        Ok(con.last_insert_rowid() as i32)
     }
 
     pub fn find_user_by_name(&self, username: &str) -> Result<User, Error> {

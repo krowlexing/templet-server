@@ -1,10 +1,10 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum_utils::VerifiebleClaim;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    db::{self, users::NewUser, Db},
-    handlers::tokens::generate_claim,
-};
+use crate::db::{self, users::NewUser, Db};
+
+use super::tokens::UserClaim;
 
 macro_rules! handle_request {
     [$name:ident($db:ident $($others:ident: $other_ty:ty),*, $body:ident : $body_type:ty) $body_block:block] => {
@@ -20,18 +20,25 @@ pub struct RegisterRequest {
 }
 
 handle_request![register(db, req: RegisterRequest) {
+    let username = req.username;
 
-    let user = db.users.find_user_by_name(&req.username);
+    let user = db.users.find_user_by_name(&username);
     if user.is_ok() {
         return (StatusCode::NOT_FOUND, "sorry".to_string());
     }
 
 
-    let result = NewUser::new(req.name, req.username.clone(), req.password)
+    let result = NewUser::new(req.name, username.clone(), req.password)
         .map(|user| db.users.insert(user));
 
     match result {
-        Ok(_) => (StatusCode::OK, generate_claim(req.username)),
+        // Insert successful
+        Ok(Ok(user_id)) => (StatusCode::OK, UserClaim { user_id }.sign()),
+        // Insert failed
+        Ok(Err(_)) => {
+            println!("Error while handling '/register', insert failed");
+            (StatusCode::NOT_FOUND, "".to_string()) },
+        // Validation failed
         Err(_) => (StatusCode::NOT_FOUND, "".to_string())
     }
 }];
@@ -44,12 +51,12 @@ pub struct LoginRequest {
 
 handle_request![login(db, req: LoginRequest) {
     use db::users::LoginError::*;
-
-    let user = db.users.find_user(&req.username, &req.password);
+    let username = req.username;
+    let user = db.users.find_user(&username, &req.password);
 
     match user {
-        Ok(_user) => {
-            (StatusCode::OK, generate_claim(req.username))
+        Ok(user) => {
+            (StatusCode::OK, UserClaim { user_id: user.id }.sign())
         },
         Err(UserNotFound) => {
             println!("registering user, but username already exists");

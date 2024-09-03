@@ -4,7 +4,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use axum_utils::unwrap_json;
+use axum_utils::{unwrap_json, Claim};
 use serde::{Deserialize, Serialize};
 
 use crate::db::{
@@ -12,7 +12,7 @@ use crate::db::{
     Db,
 };
 
-use super::tokens::Claim;
+use super::tokens::AppClaim;
 
 pub async fn all_apps(State(db): State<Db>) -> impl IntoResponse {
     match db.apps.select_all() {
@@ -35,7 +35,7 @@ pub struct NewAppRequest {
 }
 
 impl NewAppRequest {
-    pub fn with_author(self, author: String) -> NewApp {
+    pub fn with_author(self, author_id: i32) -> NewApp {
         let Self {
             title,
             description,
@@ -46,7 +46,7 @@ impl NewAppRequest {
         } = self;
 
         NewApp {
-            author,
+            author_id,
             title,
             description,
             weblink,
@@ -59,10 +59,10 @@ impl NewAppRequest {
 
 pub async fn new_app(
     State(db): State<Db>,
-    Claim(claim): Claim,
+    Claim(claim): AppClaim,
     Json(new_app): Json<NewAppRequest>,
 ) -> impl IntoResponse {
-    match db.apps.insert(new_app.with_author(claim.username)) {
+    match db.apps.insert(new_app.with_author(claim.user_id)) {
         Ok(apps) => (StatusCode::OK, serde_json::to_string(&apps).unwrap()),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
     }
@@ -90,22 +90,16 @@ pub async fn search(
 
 pub async fn by_id(
     State(db): State<Db>,
-    Claim(claim): Claim,
-    Path(id): Path<usize>,
+    Claim(claim): AppClaim,
+    Path(id): Path<i32>,
 ) -> impl IntoResponse {
-    match db.apps.by_id(id) {
-        Ok(Some(app)) => {
-            if app.public || app.author == claim.username {
-                (StatusCode::OK, unwrap_json(&app))
-            } else {
-                (StatusCode::NOT_FOUND, String::new())
-            }
-        }
-        Ok(None) => (StatusCode::NOT_FOUND, String::new()),
+    match db.apps.by_id_for_user(id, claim.user_id) {
+        Ok(Some(app)) => (StatusCode::OK, unwrap_json(&app)).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND).into_response(),
         Err(sql) => {
             println!("sql error happend while searching app with id '{id}'\n {sql:?}");
 
-            (StatusCode::INTERNAL_SERVER_ERROR, String::new())
+            (StatusCode::INTERNAL_SERVER_ERROR).into_response()
         }
     }
 }

@@ -1,10 +1,11 @@
 use std::mem::transmute;
 
+use axum_utils::copy;
 use rusqlite::{Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::Con;
+use super::{Con, SqlResult};
 
 pub struct Apps {
     con: Con,
@@ -12,7 +13,7 @@ pub struct Apps {
 
 #[derive(Serialize, Deserialize)]
 pub struct NewApp {
-    pub author: String,
+    pub author_id: i32,
     pub title: String,
     pub description: String,
     pub weblink: String,
@@ -94,7 +95,7 @@ impl Apps {
     pub fn insert(
         &self,
         NewApp {
-            author,
+            author_id,
             title,
             description,
             weblink,
@@ -115,7 +116,7 @@ impl Apps {
                 public,
                 status
             ) SELECT
-            id,?,?,?,?,?,? FROM users WHERE users.name = ?",
+            id,?,?,?,?,?,? FROM users WHERE users.id = ?",
             (
                 title,
                 description,
@@ -123,7 +124,7 @@ impl Apps {
                 version,
                 public,
                 status as usize,
-                author,
+                author_id,
             ),
         )
     }
@@ -160,12 +161,14 @@ impl Apps {
         let con = self.con.lock().unwrap();
         get_app_by_id(&con, app_id)
     }
+
+    copy!(by_id_for_user(app_id: i32, user_id: i32) -> SqlResult<Option<NewApp>>);
 }
 
 impl NewApp {
     pub fn from_row(row: &Row) -> Result<Self, rusqlite::Error> {
         Ok(Self {
-            author: row.get("author")?,
+            author_id: row.get("author_id")?,
             title: row.get("title")?,
             description: row.get("description")?,
             weblink: row.get("weblink")?,
@@ -184,4 +187,19 @@ fn get_app_by_id(con: &Connection, app_id: usize) -> Result<Option<NewApp>, rusq
     )?;
     let app = stmt.query_row([app_id], NewApp::from_row).optional()?;
     Ok(app)
+}
+
+fn by_id_for_user(con: &Connection, app_id: i32, user_id: i32) -> SqlResult<Option<NewApp>> {
+    let mut stmt = con.prepare_cached(
+        "
+        SELECT 
+            users.username as author, author_id, title, description, weblink, version, public, status 
+        FROM apps 
+        JOIN users ON apps.author_id = users.id
+        WHERE apps.id = ? AND (apps.public = TRUE OR apps.author_id = ?)
+    ",
+    )?;
+
+    stmt.query_row([app_id, user_id], NewApp::from_row)
+        .optional()
 }

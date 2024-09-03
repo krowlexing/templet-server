@@ -4,12 +4,17 @@ use std::{
 };
 
 use apps::Apps;
+use operators::Operators;
 use rusqlite::Connection;
 use users::Users;
 
 pub mod apps;
+pub mod operators;
 pub mod table;
 pub mod users;
+
+pub type SqlResult<T> = Result<T, rusqlite::Error>;
+
 pub enum SqlError {
     DbFileNotFound,
 }
@@ -36,6 +41,7 @@ pub struct SqliteDb {
     con: Con,
     pub users: Users,
     pub apps: Apps,
+    pub operators: Operators,
 }
 
 impl SqliteDb {
@@ -47,6 +53,7 @@ impl SqliteDb {
         let db = Self {
             users: Users::new(&con),
             apps: Apps::new(&con),
+            operators: Operators::new(&con),
             con,
         };
 
@@ -59,6 +66,7 @@ impl SqliteDb {
             con.execute("PRAGMA foreign_keys = ON", ())?;
         }
         self.users.create_table()?;
-        self.apps.create_table()
+        self.apps.create_table()?;
+        self.operators.create_table()
     }
 }

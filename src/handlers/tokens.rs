@@ -1,49 +1,25 @@
-use axum::async_trait;
-use axum::http::request::Parts;
+use axum_utils::{jwt_sign, jwt_verify, Claim, VerifiebleClaim};
 
-use axum::http::StatusCode;
-
-use axum::extract::FromRequestParts;
-
-use jwt::{SignWithKey, VerifyWithKey};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
-
-use hmac::{Hmac, Mac};
 
 pub(crate) const KEY: &[u8] = b"super-secret";
 
-pub fn generate_claim(username: String) -> String {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(KEY).unwrap();
-    UserClaim { username }.sign_with_key(&key).unwrap()
-}
-
-pub fn check_claim(token: &str) -> Result<UserClaim, jwt::Error> {
-    let key: Hmac<Sha256> = Hmac::new_from_slice(KEY).unwrap();
-    token.verify_with_key(&key)
-}
+pub type AppClaim = Claim<UserClaim>;
 
 #[derive(Serialize, Deserialize)]
 pub struct UserClaim {
-    pub(crate) username: String,
+    pub(crate) user_id: i32,
 }
 
-pub struct Claim(pub UserClaim);
+impl VerifiebleClaim for UserClaim {
+    fn check(claim: &str) -> Result<Self, jwt::Error>
+    where
+        Self: Sized,
+    {
+        jwt_verify(claim, KEY)
+    }
 
-#[async_trait]
-impl<S> FromRequestParts<S> for Claim
-where
-    S: Send + Sync,
-{
-    type Rejection = axum::http::StatusCode;
-
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
-        parts
-            .headers
-            .get("Authorization")
-            .ok_or(StatusCode::UNAUTHORIZED)
-            .and_then(|auth_content| auth_content.to_str().map_err(|_| StatusCode::UNAUTHORIZED))
-            .and_then(|str| check_claim(str).map_err(|_| StatusCode::UNAUTHORIZED))
-            .map(Claim)
+    fn sign(self) -> String {
+        jwt_sign(self, KEY).unwrap()
     }
 }
