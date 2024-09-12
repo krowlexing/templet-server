@@ -4,7 +4,7 @@ use axum_utils::impl_from_row;
 use rusqlite::{Connection, Error, ErrorCode, Row};
 use serde::{Deserialize, Serialize};
 
-use super::Con;
+use super::{Con, SqlResult};
 
 pub struct Users {
     con: Con,
@@ -170,4 +170,9 @@ fn search(con: &Connection, query: &str) -> Result<Vec<UserView>, rusqlite::Erro
         .collect::<Result<_, _>>()
         .unwrap();
     Ok(users)
+}
+
+pub fn user_exists(con: &Connection, user_id: i32) -> SqlResult<()> {
+    let mut stmt = con.prepare_cached("SELECT * FROM users WHERE id = ?")?;
+    stmt.query_row([user_id], |_| Ok(()))
 }

@@ -3,12 +3,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use app_users::AppUsers;
 use apps::Apps;
 use operators::Operators;
 use rusqlite::Connection;
 use users::Users;
 
+pub mod app_users;
 pub mod apps;
+pub mod brokers;
 pub mod operators;
 pub mod table;
 pub mod users;
@@ -41,6 +44,7 @@ pub struct SqliteDb {
     con: Con,
     pub users: Users,
     pub apps: Apps,
+    pub app_users: AppUsers,
     pub operators: Operators,
 }
 
@@ -54,6 +58,7 @@ impl SqliteDb {
             users: Users::new(&con),
             apps: Apps::new(&con),
             operators: Operators::new(&con),
+            app_users: AppUsers::new(&con),
             con,
         };
 
@@ -67,6 +72,37 @@ impl SqliteDb {
         }
         self.users.create_table()?;
         self.apps.create_table()?;
-        self.operators.create_table()
+        self.operators.create_table()?;
+        self.app_users.create_table()
     }
 }
+
+macro_rules! query_row {
+    ($con:ident => $sql:expr, $params:expr, $result:ty) => {{
+        let mut stmt = $con.prepare_cached($sql)?;
+        stmt.query_row($params, <$result>::from_row)
+    }};
+}
+
+pub(crate) use query_row;
+
+macro_rules! query_rows {
+    ($con:ident => $sql:expr, $params:expr, $result:ty) => {{
+        let mut stmt = $con.prepare_cached($sql)?;
+        let users = stmt
+            .query_map($params, <$result>::from_row)?
+            .collect::<Result<Vec<$result>, _>>()
+            .unwrap();
+        users
+    }};
+}
+
+pub(crate) use query_rows;
+
+macro_rules! query_execute {
+    ($con:ident => $sql:expr, $params:expr) => {{
+        $con.execute($sql, $params)
+    }};
+}
+
+pub(crate) use query_execute;

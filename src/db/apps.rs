@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use super::{Con, SqlResult};
+use super::{query_row, Con, SqlResult};
 
 pub struct Apps {
     con: Con,
@@ -190,16 +190,32 @@ fn get_app_by_id(con: &Connection, app_id: usize) -> Result<Option<NewApp>, rusq
 }
 
 fn by_id_for_user(con: &Connection, app_id: i32, user_id: i32) -> SqlResult<Option<NewApp>> {
-    let mut stmt = con.prepare_cached(
-        "
+    query_row!(con => "
         SELECT 
             users.username as author, author_id, title, description, weblink, version, public, status 
         FROM apps 
         JOIN users ON apps.author_id = users.id
-        WHERE apps.id = ? AND (apps.public = TRUE OR apps.author_id = ?)
-    ",
-    )?;
+        WHERE apps.id = ? AND (apps.public = TRUE OR apps.author_id = ?)",
+        [app_id, user_id],
+        NewApp
+    ).optional()
+}
 
-    stmt.query_row([app_id, user_id], NewApp::from_row)
-        .optional()
+pub fn has_permission(con: &Connection, app_id: i32, user_id: i32) -> SqlResult<()> {
+    let mut stmt = con.prepare_cached(
+        "
+    SELECT * FROM apps 
+    WHERE apps.id = ? AND apps.author_id = ?",
+    )?;
+    let is_owner = stmt.query_row([app_id, user_id], |_| Ok(()));
+
+    is_owner.or_else(|_| {
+        let mut stmt = con.prepare_cached(
+            "
+        SELECT * FROM apps 
+        JOIN operators ON operators.app_id = apps.id 
+        WHERE apps.id = ? AND operators.user_id = ?",
+        )?;
+        stmt.query_row([app_id, user_id], |_| Ok(()))
+    })
 }

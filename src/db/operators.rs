@@ -1,7 +1,9 @@
 use axum_utils::{copy, impl_from_row};
 use serde::{Deserialize, Serialize};
 
-use super::{Con, SqlResult};
+use crate::db::apps::has_permission;
+
+use super::{users::user_exists, Con, SqlResult};
 use rusqlite::{Connection, Row};
 
 pub struct Operators {
@@ -95,30 +97,6 @@ fn for_app(con: &Connection, app_id: i32, user_id: i32) -> SqlResult<Vec<Operato
         .query_map([app_id, user_id], Operator::from_row)?
         .collect::<Result<_, _>>();
     x
-}
-
-fn has_permission(con: &Connection, app_id: i32, user_id: i32) -> SqlResult<()> {
-    let mut stmt = con.prepare_cached(
-        "
-    SELECT * FROM apps 
-    WHERE apps.id = ? AND apps.author_id = ?",
-    )?;
-    let is_owner = stmt.query_row([app_id, user_id], |_| Ok(()));
-
-    is_owner.or_else(|_| {
-        let mut stmt = con.prepare_cached(
-            "
-        SELECT * FROM apps 
-        JOIN operators ON operators.app_id = apps.id 
-        WHERE apps.id = ? AND operators.user_id = ?",
-        )?;
-        stmt.query_row([app_id, user_id], |_| Ok(()))
-    })
-}
-
-fn user_exists(con: &Connection, user_id: i32) -> SqlResult<()> {
-    let mut stmt = con.prepare_cached("SELECT * FROM users WHERE id = ?")?;
-    stmt.query_row([user_id], |_| Ok(()))
 }
 
 #[derive(Serialize, Deserialize)]
