@@ -7,7 +7,7 @@ use db::SqliteDb;
 
 use handlers::apps::{self, all_apps, new_app};
 use handlers::auth::{login, register};
-use handlers::{app_users, operators, users};
+use handlers::{app_users, brokers, operators, users};
 
 pub mod db;
 pub mod handlers;
@@ -23,6 +23,11 @@ async fn main() {
         .route("/", post(app_users::create))
         .route("/:user_id", delete(app_users::delete));
 
+    let brokers_router = Router::new()
+        .route("/", get(brokers::all))
+        .route("/", post(brokers::create))
+        .route("/", delete(brokers::delete));
+
     let app = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
@@ -34,6 +39,7 @@ async fn main() {
             delete(operators::delete),
         )
         .nest("/apps/:app_id/users", app_users_router)
+        .nest("/apps/:app_id/brokers", brokers_router)
         .route("/apps/:app_id/info", get(apps::by_id))
         .route("/apps/search", get(apps::search))
         .route("/apps/", get(all_apps))

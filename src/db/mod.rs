@@ -5,6 +5,7 @@ use std::{
 
 use app_users::AppUsers;
 use apps::Apps;
+use brokers::Brokers;
 use operators::Operators;
 use rusqlite::Connection;
 use users::Users;
@@ -46,6 +47,7 @@ pub struct SqliteDb {
     pub apps: Apps,
     pub app_users: AppUsers,
     pub operators: Operators,
+    pub brokers: Brokers,
 }
 
 impl SqliteDb {
@@ -59,6 +61,7 @@ impl SqliteDb {
             apps: Apps::new(&con),
             operators: Operators::new(&con),
             app_users: AppUsers::new(&con),
+            brokers: Brokers::new(&con),
             con,
         };
 
@@ -73,7 +76,8 @@ impl SqliteDb {
         self.users.create_table()?;
         self.apps.create_table()?;
         self.operators.create_table()?;
-        self.app_users.create_table()
+        self.app_users.create_table()?;
+        self.brokers.create_table()
     }
 }
 
